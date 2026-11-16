@@ -22,6 +22,36 @@
 - Automatic cookie and session handling
 - Rotating HTTP/HTTPS/SOCKS5 proxy support
 
+## Durable crawling (`scraperun`)
+
+The `scraperun`, `filequeue`, `multisink` and `urlnorm` packages add a durable,
+resumable and de-duplicating crawl mode next to the existing in-memory engine.
+The entry API, job/result structures and the existing fetcher, parser, cache and
+writer adapters are reused unchanged.
+
+- **Persistent, resumable queue** (`adapters/providers/filequeue`): every state
+  transition is appended to a checksummed write-ahead log. A torn tail frame is
+  discarded on open, completed jobs never run twice, crashed in-flight jobs are
+  re-dispatched once, and normalized-link de-duplication guarantees a single
+  pending item per link.
+- **Normalization** (`urlnorm`): fragments, tracking parameters, host case and
+  trailing slashes are normalized while content-affecting query parameters are
+  preserved.
+- **Classified failure handling** (`scraperun`): network, site-rejection and
+  parse failures are counted separately and, per kind, either requeued up to a
+  configured attempt limit or moved into a durable failure list. One failure
+  never stops the whole run.
+- **Host-aware scheduling** (`scraperun`): global concurrency, per-host
+  concurrency and a per-host minimum request interval, with per-host pacing
+  persisted so the constraints survive a restart.
+- **Fault-tolerant multi-sink output** (`adapters/writers/multisink`): one sink
+  failing never stops the others; missed records are recorded in a ledger and
+  back-filled on the next run without ever writing a duplicate. Each record
+  carries its source URL and queue sequence number.
+- **Recomputable statistics** (`scraperun`): a human-readable `stats.txt` and a
+  structured `stats.json` containing the same counters, independently
+  verifiable by rescanning the queue files, result log and sink ledgers.
+
 ## JavaScript Rendering
 
 Scrapemate uses Playwright for JavaScript rendering. It requires the Playwright browsers to be installed.
